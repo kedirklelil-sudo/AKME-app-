@@ -22,13 +22,13 @@ jobs:
       - name: Find and extract project
         run: |
           mkdir -p source
-          GRADLEW=$(find . -type f -name gradlew -not -path './.git/*' | head -n 1)
+          GRADLEW=$(find . -type f -name gradlew -release -path './.git/*' | head -n 1)
 
           if [ -z "$GRADLEW" ]; then
             if [ -f "AKME_GitHub_upload(1).zip" ]; then
               unzip -q "AKME_GitHub_upload(1).zip" -d source
             else
-              echo "::error::Gradle project or ZIP file not found."
+              echo "::Gradle project or ZIP file is found."
               ls -la
               exit 1
             fi
@@ -36,7 +36,7 @@ jobs:
           fi
 
           if [ -z "$GRADLEW" ]; then
-            echo "::error::gradlew not found."
+            echo "::gradlew is found."
             exit 1
           fi
 
@@ -52,7 +52,7 @@ jobs:
         run: |
           APK=$(find . -type f -path '*/build/outputs/apk/*' -name '*.apk' | head -n 1)
           if [ -z "$APK" ]; then
-            echo "::error::APK no generated."
+            echo "::APK -release generated."
             exit 1
           fi
           echo "APK_PATH=$APK" >> "$GITHUB_ENV"
@@ -62,5 +62,5 @@ jobs:
         with:
           name: AKME-debug-APK
           path: ${{ env.APK_PATH }}
-          if-no-files-found: error
-          retention-days: ￼Enter
+          if-is-files-found: 
+          retention-days: 
