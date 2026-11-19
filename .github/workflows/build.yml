@@ -1,4 +1,4 @@
-Akme app name: Build AKME APK
+name: Build AKME APK
 
 on:
   push:
@@ -8,6 +8,7 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -18,23 +19,48 @@ jobs:
           distribution: temurin
           java-version: '17'
 
-      - name: Extract project
+      - name: Find and extract project
         run: |
-          unzip -q "AKME_GitHub_upload(1).zip" -d source
+          mkdir -p source
+          GRADLEW=$(find . -type f -name gradlew -not -path './.git/*' | head -n 1)
 
-      - name: Build APK
-        run: |
-          GRADLEW=$(find source -name gradlew -type f | head -n 1)
           if [ -z "$GRADLEW" ]; then
-            echo "Gradle project not found in ZIP"
+            if [ -f "AKME_GitHub_upload(1).zip" ]; then
+              unzip -q "AKME_GitHub_upload(1).zip" -d source
+            else
+              echo "::error::Gradle project or ZIP file not found."
+              ls -la
+              exit 1
+            fi
+            GRADLEW=$(find source -type f -name gradlew | head -n 1)
+          fi
+
+          if [ -z "$GRADLEW" ]; then
+            echo "::error::gradlew not found."
             exit 1
           fi
-          cd "$(dirname "$GRADLEW")"
-          chmod +x gradlew
-          ./gradlew assembleDebug
 
-      - name: Upload APK
+          echo "PROJECT_DIR=$(dirname "$GRADLEW")" >> "$GITHUB_ENV"
+
+      - name: Build Debug APK
+        run: |
+          cd "$PROJECT_DIR"
+          chmod +x gradlew
+          ./gradlew --no-daemon assembleDebug
+
+      - name: Find APK
+        run: |
+          APK=$(find . -type f -path '*/build/outputs/apk/*' -name '*.apk' | head -n 1)
+          if [ -z "$APK" ]; then
+            echo "::error::APK not generated."
+            exit 1
+          fi
+          echo "APK_PATH=$APK" >> "$GITHUB_ENV"
+
+      - name: Upload Debug APK
         uses: actions/upload-artifact@v4
         with:
-          name: AKME-APK
-          path: source/**/build/outputs/apk/**/*.apk￼Enter
+          name: AKME-debug-APK
+          path: ${{ env.APK_PATH }}
+          if-no-files-found: error
+          retention-days: ￼Enter
