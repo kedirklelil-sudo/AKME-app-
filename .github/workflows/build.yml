@@ -52,7 +52,7 @@ jobs:
         run: |
           APK=$(find . -type f -path '*/build/outputs/apk/*' -name '*.apk' | head -n 1)
           if [ -z "$APK" ]; then
-            echo "::error::APK not generated."
+            echo "::error::APK no generated."
             exit 1
           fi
           echo "APK_PATH=$APK" >> "$GITHUB_ENV"
