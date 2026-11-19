@@ -1,4 +1,4 @@
-name: Build AKME APK
+Akme app name: Build AKME APK
 
 on:
   push:
