@@ -36,7 +36,12 @@ jobs:
             mkdir -p "$RUNNER_TEMP/akme_source"
 
             while IFS= read -r ZIP_FILE; do
-              echo "Checking $ZIP_FILE"
+              Bash
+if [ -f "$PROJECT_DIR/pubspec.yaml" ]; then
+  echo "PROJECT_TYPE=flutter" >> "$GITHUB_ENV"
+else
+  echo "PROJECT_TYPE=gradle" >> "$GITHUB_ENV"
+fiecho "Checking $ZIP_FILE"
               unzip -oq "$ZIP_FILE" -d "$RUNNER_TEMP/akme_source"
 
               PROJECT_DIR=$(find "$RUNNER_TEMP/akme_source" -name pubspec.yaml -type f -print -quit | xargs -r dirname)
