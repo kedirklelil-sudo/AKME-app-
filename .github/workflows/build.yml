@@ -1,5 +1,6 @@
+YAML
 
-name: Build AKME APK
+name: Build AKME Debug APK
 
 on:
   push:
@@ -24,66 +25,74 @@ jobs:
           distribution: temurin
           java-version: '17'
 
-      - name: Locate or extract Android project
+      - name: Locate or extract project
         shell: bash
         run: |
-          set -euo pipefail
+          PROJECT_DIR=""
 
-          mkdir -p source
+          if [ -f "pubspec.yaml" ] || [ -f "gradlew" ]; then
+            PROJECT_DIR="$GITHUB_WORKSPACE"
+          else
+            mkdir -p "$RUNNER_TEMP/akme_source"
 
-          GRADLEW="$(find . -type f -name gradlew -not -path './.git/*' -print -quit)"
+            while IFS= read -r ZIP_FILE; do
+              echo "Checking $ZIP_FILE"
+              unzip -oq "$ZIP_FILE" -d "$RUNNER_TEMP/akme_source"
 
-          if [ -z "$GRADLEW" ]; then
-            ZIP_FILE="$(find . -maxdepth 2 -type f -name '*.zip' -print -quit)"
+              PROJECT_DIR=$(find "$RUNNER_TEMP/akme_source" -name pubspec.yaml -type f -print -quit | xargs -r dirname)
 
-            if [ -z "$ZIP_FILE" ]; then
-              echo "::error::No Gradle project or ZIP found."
-              ls -la
-              exit 1
-            fi
+              if [ -z "$PROJECT_DIR" ]; then
+                PROJECT_DIR=$(find "$RUNNER_TEMP/akme_source" -name gradlew -type f -print -quit | xargs -r dirname)
+              fi
 
-            unzip -q "$ZIP_FILE" -d source
-            GRADLEW="$(find source -type f -name gradlew -print -quit)"
+              if [ -n "$PROJECT_DIR" ]; then
+                break
+              fi
+            done < <(find . -type f -iname "*.zip")
+
           fi
 
-          if [ -z "$GRADLEW" ]; then
-            echo "::error::gradlew not found."
-            exit 1
+          if [ -z "$PROJECT_DIR" ]; then
+            PROJECT_DIR=$(find . -name pubspec.yaml -type f -print -quit | xargs -r dirname)
           fi
 
-          PROJECT_DIR="$(cd "$(dirname "$GRADLEW")" && pwd)"
+          if [ -z "$PROJECT_DIR" ]; then
+            PROJECT_DIR=$(find . -name gradlew -type f -print -quit | xargs -r dirname)
+          fi
 
-          if [ ! -f "$PROJECT_DIR/settings.gradle" ] && [ ! -f "$PROJECT_DIR/settings.gradle.kts" ]; then
-            echo "::error::Gradle settings file not found."
+          if [ -z "$PROJECT_DIR" ]; then
+            echo "ERROR: No Flutter or Android Gradle project found."
             exit 1
           fi
 
           echo "PROJECT_DIR=$PROJECT_DIR" >> "$GITHUB_ENV"
+          echo "Project found: $PROJECT_DIR"
 
-      - name: Build Debug APK
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+
+      - name: Build Flutter Debug APK
+        if: hashFiles('**/pubspec.yaml') != ''
+        working-directory: ${{ env.PROJECT_DIR }}
         run: |
-          set -euo pipefail
-          cd "$PROJECT_DIR"
+          flutter --version
+          flutter pub get
+          flutter build apk --debug
+
+      - name: Build Android Gradle APK
+        if: hashFiles('**/pubspec.yaml') == ''
+        working-directory: ${{ env.PROJECT_DIR }}
+        run: |
           chmod +x gradlew
-          ./gradlew --no-daemon assembleDebug
-
-      - name: Find Debug APK
-        run: |
-          set -euo pipefail
-
-          APK="$(find "$PROJECT_DIR" -type f -path '*/build/outputs/apk/*' -name '*.apk' -print -quit)"
-
-          if [ -z "$APK" ]; then
-            echo "::error::APK not found."
-            exit 1
-          fi
-
-          echo "APK_PATH=$APK" >> "$GITHUB_ENV"
+          ./gradlew assembleDebug
 
       - name: Upload Debug APK
         uses: actions/upload-artifact@v4
         with:
-          name: AKME-debug-APK
-          path: ${{ env.APK_PATH }}
+          name: AKME-Debug-APK
+          path: |
+            **/build/app/outputs/flutter-apk/app-debug.apk
+            **/build/outputs/apk/debug/*.apk
           if-no-files-found: error
-          retention-days: 7
